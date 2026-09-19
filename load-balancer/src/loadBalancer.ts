@@ -1,7 +1,6 @@
 import express from "express";
 import httpProxy from "http-proxy";
 import http from "http";
-import { resolve } from "dns";
 
 const app = express();
 const PORT = 3000;
@@ -43,22 +42,18 @@ async function updateHealthStatus() {
   }
 }
 
-
-function getHealthyServers()
-{
-  return servers.filter((server)=> server.healthy);
+function getHealthyServers() {
+  return servers.filter((server) => server.healthy);
 }
 
 let currentServer = 0;
 const proxy = httpProxy.createProxyServer();
 
 app.use((req, res) => {
-
   const healthyServers = getHealthyServers();
-  if(healthyServers.length=== 0)
-  {
+  if (healthyServers.length === 0) {
     return res.status(503).json({
-      message:" No healthy servers available",
+      message: " No healthy servers available",
     });
   }
   const target = healthyServers[currentServer % healthyServers.length].url;
@@ -76,3 +71,7 @@ app.listen(PORT, () => {
 });
 
 updateHealthStatus();
+
+setInterval(() => {
+  updateHealthStatus();
+}, 5000);
