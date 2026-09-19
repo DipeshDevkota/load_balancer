@@ -46,8 +46,27 @@ function getHealthyServers() {
   return servers.filter((server) => server.healthy);
 }
 
+function getNextHealthyServer(excludeUrl: string) {
+  const healthyServers = getHealthyServers().filter(
+    (server) => server.url !== excludeUrl,
+  );
+
+  if (healthyServers.length === 0) {
+    return null;
+  }
+
+  const server = healthyServers[currentServer % healthyServers.length];
+  currentServer = (currentServer + 1) % healthyServers.length;
+
+  return server.url;
+}
+
 let currentServer = 0;
 const proxy = httpProxy.createProxyServer();
+
+proxy.on("error", (error, req, res) => {
+  console.log("Proxy error:", error.message);
+});
 
 app.use((req, res) => {
   const healthyServers = getHealthyServers();
@@ -61,9 +80,37 @@ app.use((req, res) => {
 
   currentServer = (currentServer + 1) % healthyServers.length;
 
-  proxy.web(req, res, {
-    target,
-  });
+  proxy.web(
+    req,
+    res,
+    {
+      target,
+    },
+    (error) => {
+      console.log(`Request failed for ${target}`);
+      console.log(error.message);
+
+      const failedServer = servers.find((server) => server.url === target);
+
+      if (failedServer) {
+        failedServer.healthy = false;
+        console.log(`${target} marked as unhealthy`);
+      }
+
+      const retryTarget = getNextHealthyServer(target);
+      if (!retryTarget) {
+        return res.status(503).json({
+          message: "No healthy servers available",
+        });
+      }
+
+      console.log(`Failing over to ${retryTarget}`);
+
+      proxy.web(req, res, {
+        target: retryTarget,
+      });
+    },
+  );
 });
 
 app.listen(PORT, () => {
@@ -74,4 +121,4 @@ updateHealthStatus();
 
 setInterval(() => {
   updateHealthStatus();
-}, 5000);
+}, 15000);
