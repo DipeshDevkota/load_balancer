@@ -5,6 +5,8 @@ import http from "http";
 const app = express();
 const PORT = 3000;
 
+const MAX_RETRIES = 2;
+
 const servers = [
   {
     url: "http://localhost:3001",
@@ -46,9 +48,9 @@ function getHealthyServers() {
   return servers.filter((server) => server.healthy);
 }
 
-function getNextHealthyServer(excludeUrl: string) {
+function getNextHealthyServer(attemptedServers: string[]) {
   const healthyServers = getHealthyServers().filter(
-    (server) => server.url !== excludeUrl,
+    (server) => !attemptedServers.includes(server.url),
   );
 
   if (healthyServers.length === 0) {
@@ -69,6 +71,9 @@ proxy.on("error", (error, req, res) => {
 });
 
 app.use((req, res) => {
+  let retryCount = 0;
+
+  const attemptedServers: string[] = [];
   const healthyServers = getHealthyServers();
   if (healthyServers.length === 0) {
     return res.status(503).json({
@@ -76,6 +81,7 @@ app.use((req, res) => {
     });
   }
   const target = healthyServers[currentServer % healthyServers.length].url;
+  attemptedServers.push(target);
   console.log(`Forwarding request to ${target}`);
 
   currentServer = (currentServer + 1) % healthyServers.length;
@@ -87,6 +93,13 @@ app.use((req, res) => {
       target,
     },
     (error) => {
+      retryCount++;
+
+      if (retryCount > MAX_RETRIES) {
+        return res.status(503).json({
+          message: "Maximum retries exceeded",
+        });
+      }
       console.log(`Request failed for ${target}`);
       console.log(error.message);
 
@@ -97,7 +110,7 @@ app.use((req, res) => {
         console.log(`${target} marked as unhealthy`);
       }
 
-      const retryTarget = getNextHealthyServer(target);
+      const retryTarget = getNextHealthyServer(attemptedServers);
       if (!retryTarget) {
         return res.status(503).json({
           message: "No healthy servers available",
@@ -106,6 +119,7 @@ app.use((req, res) => {
 
       console.log(`Failing over to ${retryTarget}`);
 
+      attemptedServers.push(retryTarget);
       proxy.web(req, res, {
         target: retryTarget,
       });
