@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "server1": "nodemon --exec tsx src/servers/server1.ts",
+    "server2": "nodemon --exec tsx src/servers/server2.ts",
+    "server3": "nodemon --exec tsx src/servers/server3.ts"
   },
   "keywords": [],
   "author": "",
@@ -18,7 +20,8 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.1",
-    "tsx": "^4.23.13",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
 }

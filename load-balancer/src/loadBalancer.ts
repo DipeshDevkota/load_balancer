@@ -1,130 +1,100 @@
 import express from "express";
 import httpProxy from "http-proxy";
-import http from "http";
+
+import { PORT, MAX_RETRIES, HEALTH_CHECK_INTERVAL, servers } from "./config";
+
+import { updateHealthStatus } from "./healthChecker";
+
+import {
+  getNextServer,
+  getNextRetryServer,
+  incrementRequestCount,
+} from "./serverManager";
 
 const app = express();
-const PORT = 3000;
 
-const MAX_RETRIES = 2;
-
-const servers = [
-  {
-    url: "http://localhost:3001",
-    healthy: false,
-  },
-
-  { url: "http://localhost:3002", healthy: false },
-  {
-    url: "http://localhost:3003",
-    healthy: false,
-  },
-];
-
-async function checkHealth(server: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const request = http.get(`${server}/health`, (res) => {
-      resolve(res.statusCode === 200);
-    });
-
-    request.on("error", () => {
-      resolve(false);
-    });
-
-    request.setTimeout(2000, () => {
-      request.destroy();
-      resolve(false);
-    });
-  });
-}
-
-async function updateHealthStatus() {
-  for (const server of servers) {
-    server.healthy = await checkHealth(server.url);
-    console.log(`${server.url} healthy : ${server.healthy}`);
-  }
-}
-
-function getHealthyServers() {
-  return servers.filter((server) => server.healthy);
-}
-
-function getNextHealthyServer(attemptedServers: string[]) {
-  const healthyServers = getHealthyServers().filter(
-    (server) => !attemptedServers.includes(server.url),
-  );
-
-  if (healthyServers.length === 0) {
-    return null;
-  }
-
-  const server = healthyServers[currentServer % healthyServers.length];
-  currentServer = (currentServer + 1) % healthyServers.length;
-
-  return server.url;
-}
-
-let currentServer = 0;
 const proxy = httpProxy.createProxyServer();
 
-proxy.on("error", (error, req, res) => {
+proxy.on("error", (error) => {
   console.log("Proxy error:", error.message);
 });
 
+app.get("/stats", (req, res) => {
+  res.json(servers);
+});
 app.use((req, res) => {
+  const startTime = Date.now();
+
   let retryCount = 0;
 
   const attemptedServers: string[] = [];
-  const healthyServers = getHealthyServers();
-  if (healthyServers.length === 0) {
+
+  const target = getNextServer();
+
+  if (!target) {
     return res.status(503).json({
-      message: " No healthy servers available",
+      message: "No healthy servers available",
     });
   }
-  const target = healthyServers[currentServer % healthyServers.length].url;
+
+  incrementRequestCount(target);
   attemptedServers.push(target);
-  console.log(`Forwarding request to ${target}`);
 
-  currentServer = (currentServer + 1) % healthyServers.length;
+  console.log(`[LOAD BALANCER] ${req.method} ${req.url} -> ${target}`);
 
-  proxy.web(
-    req,
-    res,
-    {
-      target,
-    },
-    (error) => {
-      retryCount++;
+  res.on("finish", () => {
+    const duration = Date.now() - startTime;
 
-      if (retryCount > MAX_RETRIES) {
-        return res.status(503).json({
-          message: "Maximum retries exceeded",
-        });
-      }
-      console.log(`Request failed for ${target}`);
-      console.log(error.message);
+    console.log(
+      `[LOAD BALANCER] ${req.method} ${req.url} | ${res.statusCode} | ${duration}ms`,
+    );
+  });
 
-      const failedServer = servers.find((server) => server.url === target);
+  function forwardRequest(target: string) {
+    proxy.web(
+      req,
+      res,
+      {
+        target,
+      },
+      (error) => {
+        retryCount++;
 
-      if (failedServer) {
-        failedServer.healthy = false;
-        console.log(`${target} marked as unhealthy`);
-      }
+        console.log(`Request failed for ${target}`);
+        console.log(error.message);
 
-      const retryTarget = getNextHealthyServer(attemptedServers);
-      if (!retryTarget) {
-        return res.status(503).json({
-          message: "No healthy servers available",
-        });
-      }
+        const failedServer = servers.find((server) => server.url === target);
 
-      console.log(`Failing over to ${retryTarget}`);
+        if (failedServer) {
+          failedServer.healthy = false;
 
-      attemptedServers.push(retryTarget);
-      proxy.web(req, res, {
-        target: retryTarget,
-      });
-    },
-  );
+          console.log(`${target} marked as unhealthy`);
+        }
+
+        if (retryCount > MAX_RETRIES) {
+          return res.status(503).json({
+            message: "Maximum retries exceeded",
+          });
+        }
+
+        const retryTarget = getNextRetryServer(attemptedServers);
+
+        if (!retryTarget) {
+          return res.status(503).json({
+            message: "No healthy servers available",
+          });
+        }
+
+        console.log(`Failing over to ${retryTarget}`);
+
+        attemptedServers.push(retryTarget);
+
+        forwardRequest(retryTarget);
+      },
+    );
+  }
+
+  forwardRequest(target);
 });
 
 app.listen(PORT, () => {
@@ -135,4 +105,4 @@ updateHealthStatus();
 
 setInterval(() => {
   updateHealthStatus();
-}, 15000);
+}, HEALTH_CHECK_INTERVAL);
