@@ -48,3 +48,17 @@ export function incrementRequestCount(serverUrl: string) {
     server.requests++;
   }
 }
+
+export function incrementSuccessCount(serverUrl: string) {
+  const server = servers.find((server) => server.url === serverUrl);
+  if (server) {
+    server.successes++;
+  }
+}
+
+export function incrementFailureCount(serverUrl: string) {
+  const server = servers.find((server) => server.url === serverUrl);
+  if (server) {
+    server.failures++;
+  }
+}

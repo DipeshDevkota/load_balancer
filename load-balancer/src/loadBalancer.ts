@@ -9,11 +9,17 @@ import {
   getNextServer,
   getNextRetryServer,
   incrementRequestCount,
+  incrementFailureCount,
+  incrementSuccessCount,
 } from "./serverManager";
 
 const app = express();
 
 const proxy = httpProxy.createProxyServer();
+
+proxy.on("proxyRes", (proxyRes, req) => {
+  console.log(`Backend responded with status:${proxyRes.statusCode}`);
+});
 
 proxy.on("error", (error) => {
   console.log("Proxy error:", error.message);
@@ -51,6 +57,16 @@ app.use((req, res) => {
   });
 
   function forwardRequest(target: string) {
+    proxy.once("proxyRes", (proxyRes) => {
+      if (
+        proxyRes.statusCode &&
+        proxyRes.statusCode >= 200 &&
+        proxyRes.statusCode < 400
+      ) {
+        incrementSuccessCount(target);
+      }
+    });
+
     proxy.web(
       req,
       res,
@@ -60,7 +76,9 @@ app.use((req, res) => {
       (error) => {
         retryCount++;
 
+        incrementFailureCount(target);
         console.log(`Request failed for ${target}`);
+
         console.log(error.message);
 
         const failedServer = servers.find((server) => server.url === target);
