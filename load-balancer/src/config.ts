@@ -1,8 +1,12 @@
-export const PORT = 3000;
+import "dotenv/config";
 
-export const MAX_RETRIES = 2;
+export const PORT = Number(process.env.PORT) || 3000;
 
-export const HEALTH_CHECK_INTERVAL = 15000;
+export const MAX_RETRIES = Number(process.env.MAX_RETRIES) || 2;
+
+export const HEALTH_CHECK_INTERVAL =
+  Number(process.env.HEALTH_CHECK_INTERVAL) || 15000;
+
 export const servers = [
   {
     url: "http://localhost:3001",

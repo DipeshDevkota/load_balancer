@@ -1,0 +1,74 @@
+/* LOAD BALANCER */
+
+.load-balancer-card {
+  background: linear-gradient(110deg, #111827, #0e131d);
+
+  border: 1px solid #293348;
+
+  border-radius: 13px;
+
+  padding: 22px;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 17px;
+}
+
+.lb-icon {
+  width: 48px;
+  height: 48px;
+
+  border-radius: 12px;
+
+  background: rgba(99, 102, 241, 0.12);
+
+  color: #818cf8;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  font-size: 23px;
+}
+
+.lb-info {
+  min-width: 190px;
+}
+
+.lb-info h3 {
+  font-size: 14px;
+}
+
+.lb-info p {
+  color: #667085;
+
+  font-size: 11px;
+
+  margin-top: 5px;
+}
+
+.lb-details {
+  margin-left: auto;
+
+  display: flex;
+
+  gap: 50px;
+}
+
+.lb-details span {
+  display: block;
+
+  color: #697386;
+
+  font-size: 10px;
+
+  margin-bottom: 5px;
+}
+
+.lb-details strong {
+  font-size: 12px;
+}

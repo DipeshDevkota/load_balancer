@@ -1,4 +1,6 @@
 import express from "express";
+import cors from "cors";
+import { randomUUID } from "crypto";
 import httpProxy from "http-proxy";
 
 import { PORT, MAX_RETRIES, HEALTH_CHECK_INTERVAL, servers } from "./config";
@@ -13,22 +15,26 @@ import {
   incrementSuccessCount,
 } from "./serverManager";
 
-const app = express();
+import { logInfo, logError, logWarning } from "./logger";
 
+const app = express();
+app.use(cors());
 const proxy = httpProxy.createProxyServer();
 
 proxy.on("proxyRes", (proxyRes, req) => {
-  console.log(`Backend responded with status:${proxyRes.statusCode}`);
+  logInfo(`Backend responded with status: ${proxyRes.statusCode}`);
 });
 
 proxy.on("error", (error) => {
-  console.log("Proxy error:", error.message);
+  logError(`Proxy error: ${error.message}`);
 });
 
 app.get("/stats", (req, res) => {
   res.json(servers);
 });
+
 app.use((req, res) => {
+  const requestId = randomUUID();
   const startTime = Date.now();
 
   let retryCount = 0;
@@ -44,15 +50,16 @@ app.use((req, res) => {
   }
 
   incrementRequestCount(target);
+
   attemptedServers.push(target);
 
-  console.log(`[LOAD BALANCER] ${req.method} ${req.url} -> ${target}`);
+  logInfo(`[ID: ${requestId}] ${req.method} ${req.url} -> ${target}`);
 
   res.on("finish", () => {
     const duration = Date.now() - startTime;
 
-    console.log(
-      `[LOAD BALANCER] ${req.method} ${req.url} | ${res.statusCode} | ${duration}ms`,
+    logInfo(
+      `[ID: ${requestId}] ${req.method} ${req.url} | ${res.statusCode} | ${duration}ms`,
     );
   });
 
@@ -77,16 +84,17 @@ app.use((req, res) => {
         retryCount++;
 
         incrementFailureCount(target);
-        console.log(`Request failed for ${target}`);
 
-        console.log(error.message);
+        logError(`[ID: ${requestId}] Request failed for ${target}`);
+
+        logError(`[ID: ${requestId}] ${error.message}`);
 
         const failedServer = servers.find((server) => server.url === target);
 
         if (failedServer) {
           failedServer.healthy = false;
 
-          console.log(`${target} marked as unhealthy`);
+          logWarning(`[ID: ${requestId}] ${target} marked as unhealthy`);
         }
 
         if (retryCount > MAX_RETRIES) {
@@ -103,7 +111,7 @@ app.use((req, res) => {
           });
         }
 
-        console.log(`Failing over to ${retryTarget}`);
+        logWarning(`[ID: ${requestId}] Failing over to ${retryTarget}`);
 
         attemptedServers.push(retryTarget);
 
@@ -116,7 +124,7 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Load Balancer running on http://localhost:${PORT}`);
+  logInfo(`Load Balancer running on http://localhost:${PORT}`);
 });
 
 updateHealthStatus();

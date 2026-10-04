@@ -1,122 +1,121 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+
+import { useEffect, useState } from "react";
+import axios from "axios";
+import type { Server, ServerStatsResponse } from "./types";
+
+import Sidebar from "./components/Sidebar";
+import DashboardHeader from "./components/DashboardHeader";
+import OverviewCards from "./components/OverviewCards";
+import LoadBalancerCard from "./components/LoadBalancerCard";
+import BackendServers from "./components/BackendServers";
+import TrafficDistribution from "./components/TrafficDistribution";
+import LoadingScreen from "./components/LoadingScreen";
+
+import "./App.css";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [servers, setServers] = useState<Server[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [apiError, setApiError] = useState(false);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await axios.get<ServerStatsResponse[]>("/api/stats");
+
+        setServers(
+          response.data.map(({ requests, successes, failures, ...server }) => ({
+            ...server,
+            requestCount: requests,
+            successCount: successes,
+            failureCount: failures,
+          })),
+        );
+        setLastUpdated(new Date());
+        setApiError(false);
+      } catch (error) {
+        console.error("Failed to fetch server stats:", error);
+        setApiError(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+
+    const interval = setInterval(fetchStats, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const healthyServers = servers.filter(
+    (server) => server.healthy
+  ).length;
+
+  const unhealthyServers = servers.filter(
+    (server) => !server.healthy
+  ).length;
+
+  const totalRequests = servers.reduce(
+    (total, server) => total + server.requestCount,
+    0
+  );
+
+  const totalSuccesses = servers.reduce(
+    (total, server) => total + server.successCount,
+    0
+  );
+
+  const totalFailures = servers.reduce(
+    (total, server) => total + server.failureCount,
+    0
+  );
+
+  const successRate =
+    totalRequests > 0
+      ? ((totalSuccesses / totalRequests) * 100).toFixed(1)
+      : "0.0";
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="dashboard">
+      <Sidebar />
 
-      <div className="ticks"></div>
+      <main className="main">
+        <DashboardHeader lastUpdated={lastUpdated} />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        {apiError && (
+          <div className="api-error">
+            Unable to connect to the load balancer.
+            Retrying automatically...
+          </div>
+        )}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        <OverviewCards
+          totalRequests={totalRequests}
+          healthyServers={healthyServers}
+          totalServers={servers.length}
+          unhealthyServers={unhealthyServers}
+          totalFailures={totalFailures}
+          totalSuccesses={totalSuccesses}
+          successRate={successRate}
+        />
+
+        <LoadBalancerCard />
+
+        <BackendServers servers={servers} />
+
+        <TrafficDistribution
+          servers={servers}
+          totalRequests={totalRequests}
+        />
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;

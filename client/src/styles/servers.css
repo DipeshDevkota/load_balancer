@@ -1,0 +1,171 @@
+/* SERVER GRID */
+
+.servers-grid {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  gap: 17px;
+}
+
+.server-card {
+  background: #0e131d;
+
+  border: 1px solid #1c2432;
+
+  border-radius: 13px;
+
+  padding: 19px;
+
+  transition: 0.2s;
+}
+
+.server-card:hover {
+  border-color: #344056;
+
+  transform: translateY(-2px);
+}
+
+.server-card.server-down {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.server-header {
+  display: flex;
+
+  align-items: flex-start;
+
+  justify-content: space-between;
+
+  gap: 10px;
+}
+
+.server-title {
+  display: flex;
+
+  gap: 11px;
+
+  align-items: center;
+}
+
+.server-icon,
+.mini-server {
+  width: 34px;
+  height: 34px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  background: #171e2b;
+
+  border-radius: 8px;
+
+  color: #8b95a7;
+
+  font-size: 12px;
+
+  font-weight: 700;
+}
+
+.server-title h3 {
+  font-size: 13px;
+}
+
+.server-title p {
+  color: #667085;
+
+  font-size: 10px;
+
+  margin-top: 4px;
+}
+
+.server-divider {
+  height: 1px;
+
+  background: #1b2330;
+
+  margin: 18px 0;
+}
+
+.server-metrics {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  gap: 10px;
+}
+
+.server-metrics span {
+  display: block;
+
+  color: #687386;
+
+  font-size: 9px;
+
+  margin-bottom: 5px;
+}
+
+.server-metrics strong {
+  font-size: 15px;
+}
+
+.success-number {
+  color: #4ade80;
+}
+
+.failure-number {
+  color: #f87171;
+}
+
+.progress-section {
+  margin-top: 20px;
+}
+
+.progress-label {
+  display: flex;
+
+  justify-content: space-between;
+
+  font-size: 9px;
+
+  color: #687386;
+
+  margin-bottom: 7px;
+}
+
+.progress-label strong {
+  color: #a4adbc;
+}
+
+.progress-bar,
+.traffic-bar {
+  height: 5px;
+
+  background: #1b2330;
+
+  border-radius: 10px;
+
+  overflow: hidden;
+}
+
+.api-error {
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  font-size: 13px;
+}
+.progress {
+  height: 100%;
+
+  background: #6366f1;
+
+  border-radius: 10px;
+
+  transition: width 0.4s;
+}
