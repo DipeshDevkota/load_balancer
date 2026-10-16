@@ -1,0 +1,58 @@
+
+services:
+  load-balancer:
+    build: ./load-balancer
+    env_file:
+      - ./load-balancer/.env
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DOCKER: "true"
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+    networks:
+      - queueless-network
+
+  backend1:
+    build: ./backend
+    command: npx tsx src/servers/server1.ts
+    environment:
+      PORT: "3001"
+    networks:
+      - queueless-network
+
+  backend2:
+    build: ./backend
+    command: npx tsx src/servers/server2.ts
+    environment:
+      PORT: "3002"
+    networks:
+      - queueless-network
+
+  backend3:
+    build: ./backend
+    command: npx tsx src/servers/server3.ts
+    environment:
+      PORT: "3003"
+    networks:
+      - queueless-network
+
+  frontend:
+    build: ./client
+    env_file:
+      - ./client/.env
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_PROXY_TARGET: http://load-balancer:3000
+    depends_on:
+      - load-balancer
+    networks:
+      - queueless-network
+
+networks:
+  queueless-network:
+    driver: bridge
